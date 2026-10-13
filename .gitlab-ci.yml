@@ -1,21 +1,16 @@
 image:
   name: registry.gitlab.com/gitlab-org/gitlab-build-images:terraform
-  entrypoint:
-    - '/usr/bin/env'
-    - 'PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'
+  entrypoint: [""]
 
 variables:
-  AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
-  AWS_SECRET_ACCESS_KEY : ${AWS_SECRET_ACCESS_KEY}
   AWS_DEFAULT_REGION: "us-east-1"
+  TF_IN_AUTOMATION: "true"
+  TF_INPUT: "false"
 
 cache:
+  key: terraform
   paths:
-    - .terraform
-
-before_script:
-  - terraform --version
-  - terraform init -backend-config="tfstate.config"
+    - .terraform/
 
 stages:
   - validate
@@ -23,31 +18,49 @@ stages:
   - apply
   - destroy
 
+before_script:
+  - terraform --version
+  - terraform init
+
 validate:
   stage: validate
+  tags:
+    - gitlab-org
   script:
+    - terraform fmt -check -recursive
     - terraform validate
 
 plan:
   stage: plan
+  tags:
+    - gitlab-org
   script:
-    - terraform plan -out="planfile"
-  dependencies:
-    - validate
+    - terraform plan -out=planfile
   artifacts:
     paths:
       - planfile
+    expire_in: 1 day
 
 apply:
   stage: apply
+  tags:
+    - gitlab-org
   script:
-    - terraform apply -input=false "planfile"
+    - terraform apply -input=false planfile
   dependencies:
     - plan
   when: manual
+  allow_failure: false
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
 
-# destroy: 
-#   stage: destroy
-#   script:
-#     - terraform destroy --auto-approve
-#   when: manual 
+destroy:
+  stage: destroy
+  tags:
+    - gitlab-org
+  script:
+    - terraform destroy -input=false -auto-approve
+  when: manual
+  allow_failure: false
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
