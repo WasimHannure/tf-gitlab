@@ -64,3 +64,4 @@ destroy:
   allow_failure: false
   rules:
     - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+
